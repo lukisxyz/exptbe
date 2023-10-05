@@ -26,8 +26,13 @@ export class PostgresBookRepository implements BookRepository {
     port: 5433,
   });
 
-  constructor(Name: string, Description: string, Expense: number) {
-    this.ID = ulid();
+  constructor(
+    ID: string | null,
+    Name: string,
+    Description: string,
+    Expense: number
+  ) {
+    this.ID = ID ? ID : ulid();
     this.Name = Name;
     this.Description = Description;
     this.Expense = Expense;
@@ -39,8 +44,26 @@ export class PostgresBookRepository implements BookRepository {
     const client = await PostgresBookRepository.pool.connect();
     try {
       const result = await client.query(
-        "INSERT INTO books (id, name, description, expense, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-        [this.ID, this.Name, this.Description, this.Expense, this.CreatedAt]
+        `INSERT INTO books
+          (id, name, description, expense, created_at)
+        VALUES
+          ($1, $2, $3, $4, $5)
+        ON CONFLICT
+          (id)
+        DO UPDATE
+          SET name = EXCLUDED.name,
+          description = EXCLUDED.description,
+          expense = EXCLUDED.expense,
+          updated_at = $6
+        RETURNING id`,
+        [
+          this.ID,
+          this.Name,
+          this.Description,
+          this.Expense,
+          this.CreatedAt,
+          new Date(),
+        ]
       );
       this.ID = result.rows[0].id;
       return this;
